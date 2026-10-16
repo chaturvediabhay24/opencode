@@ -7,6 +7,7 @@ export type DtocEntry = {
   timestamp: number
   visible: boolean
   originalOutput: string
+  replacementOutput?: string
 }
 
 export type DtocOptions = {
@@ -31,23 +32,27 @@ function createSession(): SessionState {
   }
 }
 
-export function metadataFor(entry: DtocEntry, status: "visible" | "hidden") {
+export function metadataFor(entry: DtocEntry, status: "visible" | "hidden" | "replaced") {
   const restore = status === "hidden" ? `\nrestore: call manage_context with ${entry.toolKey}` : ""
+  const replacement = status === "replaced"
+    ? `\nreplacement_characters: ${entry.replacementOutput?.length ?? 0}\nsource: llm`
+    : ""
   return [
     DTOC_METADATA_START,
     `tool_key: ${entry.toolKey}`,
     `tool: ${entry.tool}`,
     `characters: ${entry.characters}`,
     `timestamp: ${entry.timestamp}`,
-    `status: ${status}${restore}`,
+    `status: ${status}${restore}${replacement}`,
     DTOC_METADATA_END,
   ].join("\n")
 }
 
 export function renderToolOutput(entry: DtocEntry) {
-  const metadata = metadataFor(entry, entry.visible ? "visible" : "hidden")
+  const status = !entry.visible ? "hidden" : entry.replacementOutput !== undefined ? "replaced" : "visible"
+  const metadata = metadataFor(entry, status)
   if (!entry.visible) return `${metadata}\n\n[Full tool output hidden by DTOC.]`
-  return `${metadata}\n\n${entry.originalOutput}`
+  return `${metadata}\n\n${entry.replacementOutput ?? entry.originalOutput}`
 }
 
 export class DtocState {
@@ -120,8 +125,27 @@ export class DtocState {
     const changed: string[] = []
     for (const toolKey of toolKeys) {
       const entry = state.entriesByToolKey.get(toolKey)
-      if (!entry || entry.visible === visible) continue
+      if (!entry) continue
+      if (visible && entry.visible && entry.replacementOutput === undefined) continue
+      if (!visible && !entry.visible) continue
       entry.visible = visible
+      if (visible) entry.replacementOutput = undefined
+      changed.push(toolKey)
+    }
+    return changed
+  }
+
+  replace(sessionID: string, replacements: Record<string, string>) {
+    const state = this.sessions.get(sessionID)
+    if (!state) return []
+
+    const changed: string[] = []
+    for (const [toolKey, replacementOutput] of Object.entries(replacements)) {
+      const entry = state.entriesByToolKey.get(toolKey)
+      if (!entry) continue
+      if (entry.replacementOutput === replacementOutput && entry.visible) continue
+      entry.replacementOutput = replacementOutput
+      entry.visible = true
       changed.push(toolKey)
     }
     return changed

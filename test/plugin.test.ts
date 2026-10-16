@@ -9,6 +9,7 @@ describe("DTOC plugin hook", () => {
     await hooks["experimental.chat.system.transform"]?.({} as never, system)
     expect(system.system.join("\n")).toContain("DTOC (Dynamic Tool Output Compression) is active")
     expect(system.system.join("\n")).toContain("character count")
+    expect(system.system.join("\n")).toContain("tool_key-to-text map")
     expect(system.system.join("\n")).toContain("batch multiple visibility changes")
     expect(system.system.join("\n")).toContain("not a strict requirement")
 
@@ -41,5 +42,18 @@ describe("DTOC plugin hook", () => {
     await transform?.({}, output as never)
     expect(part.state.output).toContain("status: visible")
     expect(part.state.output).toContain("full shell output")
+
+    await hooks.tool?.manage_context.execute({ replace: { "tk_001": "Shell completed successfully." } } as never, { sessionID: "session-1" } as never)
+    await transform?.({}, output as never)
+    expect(part.state.output).toContain("status: replaced")
+    expect(part.state.output).toContain("source: llm")
+    expect(part.state.output).toContain("Shell completed successfully.")
+    expect(part.state.output).not.toContain("full shell output")
+
+    const conflict = await hooks.tool?.manage_context.execute({
+      enable: ["tk_001"],
+      replace: { "tk_001": "conflicting text" },
+    } as never, { sessionID: "session-1" } as never)
+    expect(conflict.title).toContain("No context changes applied")
   })
 })

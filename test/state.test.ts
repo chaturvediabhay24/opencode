@@ -56,4 +56,24 @@ describe("DTOC state", () => {
     expect(renderToolOutput(entry)).toContain("status: visible")
     expect(renderToolOutput(entry)).toContain("matches")
   })
+
+  test("replaces output while preserving the original for restoration", () => {
+    const state = new DtocState()
+    const entry = state.register({
+      sessionID: "session-1",
+      callID: "call-1",
+      tool: "test",
+      output: "42 tests passed with no failures",
+    })
+
+    expect(state.replace("session-1", { [entry.toolKey]: "All 42 tests passed. No failures." })).toEqual(["tk_001"])
+    expect(renderToolOutput(entry)).toContain("status: replaced")
+    expect(renderToolOutput(entry)).toContain("source: llm")
+    expect(renderToolOutput(entry)).toContain("All 42 tests passed. No failures.")
+    expect(renderToolOutput(entry)).not.toContain("42 tests passed with no failures")
+
+    expect(state.setVisibility("session-1", [entry.toolKey], true)).toEqual(["tk_001"])
+    expect(renderToolOutput(entry)).toContain("status: visible")
+    expect(renderToolOutput(entry)).toContain("42 tests passed with no failures")
+  })
 })
