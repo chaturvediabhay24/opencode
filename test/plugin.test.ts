@@ -25,12 +25,14 @@ describe("DTOC plugin hook", () => {
     expect(part.state.output).toContain("characters: 17")
     expect(part.state.output).toContain("full shell output")
 
-    await hooks.tool?.manage_context.execute(
-      { enable: [], disable: ["tk_001"] },
-      { sessionID: "session-1" } as never,
-    )
+    await hooks.tool?.manage_context.execute({ disable: ["tk_001"] } as never, { sessionID: "session-1" } as never)
     await transform?.({}, output as never)
     expect(part.state.output).toContain("status: hidden")
     expect(part.state.output).not.toContain("full shell output")
+
+    await hooks.tool?.manage_context.execute({ enable: ["tk_001"] } as never, { sessionID: "session-1" } as never)
+    await transform?.({}, output as never)
+    expect(part.state.output).toContain("status: visible")
+    expect(part.state.output).toContain("full shell output")
   })
 })

@@ -46,14 +46,22 @@ export const DtocPlugin: Plugin = async (_input, rawOptions) => {
       [MANAGE_CONTEXT_TOOL]: tool({
         description:
           "Control which previous tool outputs remain visible to the model. Use tool_key values from DTOC metadata. " +
-          "Set enable or disable to an array; pass an empty array when unused.",
+          "Set enable or disable to an array; either field may be omitted when unused.",
         args: {
-          enable: tool.schema.array(tool.schema.string()).describe("Tool keys whose full output should be restored."),
-          disable: tool.schema.array(tool.schema.string()).describe("Tool keys whose output should be hidden."),
+          enable: tool.schema
+            .array(tool.schema.string())
+            .optional()
+            .describe("Tool keys whose full output should be restored."),
+          disable: tool.schema
+            .array(tool.schema.string())
+            .optional()
+            .describe("Tool keys whose output should be hidden."),
         },
         async execute(args, context) {
-          const enabled = state.setVisibility(context.sessionID, args.enable, true)
-          const disabled = state.setVisibility(context.sessionID, args.disable, false)
+          // Models often omit the unused side of this command. Treat a missing
+          // array as empty instead of failing inside DtocState.setVisibility.
+          const enabled = state.setVisibility(context.sessionID, args.enable ?? [], true)
+          const disabled = state.setVisibility(context.sessionID, args.disable ?? [], false)
           const entries = state.list(context.sessionID)
 
           return {
