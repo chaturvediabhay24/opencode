@@ -9,6 +9,8 @@ describe("DTOC plugin hook", () => {
     await hooks["experimental.chat.system.transform"]?.({} as never, system)
     expect(system.system.join("\n")).toContain("DTOC (Dynamic Tool Output Compression) is active")
     expect(system.system.join("\n")).toContain("character count")
+    expect(system.system.join("\n")).toContain("batch multiple visibility changes")
+    expect(system.system.join("\n")).toContain("not a strict requirement")
 
     const part = {
       sessionID: "session-1",

@@ -23,6 +23,8 @@ const DTOC_AGENT_INSTRUCTIONS = [
   "- Before producing a final response, hide irrelevant outputs so the active context contains only evidence needed for an accurate answer.",
   "- Restore a hidden output whenever you need to revisit its exact contents.",
   "",
+  "Reminder, when practical (not a strict requirement): batch multiple visibility changes into one manage_context call instead of making separate calls for individual tool outputs.",
+  "",
   "For manage_context, provide enable and/or disable arrays of tool_key values. Either array may be omitted when unused.",
 ].join("\n")
 
