@@ -7,6 +7,25 @@ type TransformOutput = Parameters<MessagesTransform>[1]
 
 const MANAGE_CONTEXT_TOOL = "manage_context"
 
+const DTOC_AGENT_INSTRUCTIONS = [
+  "DTOC (Dynamic Tool Output Compression) is active for this session.",
+  "",
+  "When DTOC is active:",
+  "- Completed tool outputs include a plain-text DTOC metadata block with a tool_key, tool name, character count, timestamp, and visibility status.",
+  "- You have access to the manage_context tool to hide or restore tool outputs by their tool_key.",
+  "- Hidden outputs are replaced with compact placeholders to save context space.",
+  "- You can restore any hidden output when needed; the original content remains preserved in session history.",
+  "",
+  "DTOC strategy:",
+  "- Gather related context efficiently, then hide outputs that are no longer relevant to the current reasoning step.",
+  "- When you re-read a file after editing it, hide the older stale output so only the current version remains visible.",
+  "- Hide large outputs that contain information you have already extracted or no longer need.",
+  "- Before producing a final response, hide irrelevant outputs so the active context contains only evidence needed for an accurate answer.",
+  "- Restore a hidden output whenever you need to revisit its exact contents.",
+  "",
+  "For manage_context, provide enable and/or disable arrays of tool_key values. Either array may be omitted when unused.",
+].join("\n")
+
 function optionsFromUnknown(options: Record<string, unknown> | undefined): DtocOptions {
   return {
     enabled: options?.enabled !== false,
@@ -84,6 +103,10 @@ export const DtocPlugin: Plugin = async (_input, rawOptions) => {
     "experimental.chat.messages.transform": async (_input, output) => {
       if (!state.isEnabled() || !sessionIDFromMessages(output)) return
       transformMessages(state, output)
+    },
+    "experimental.chat.system.transform": async (_input, output) => {
+      if (!state.isEnabled()) return
+      output.system.push(DTOC_AGENT_INSTRUCTIONS)
     },
   }
 }

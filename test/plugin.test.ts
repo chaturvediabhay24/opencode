@@ -5,6 +5,11 @@ describe("DTOC plugin hook", () => {
   test("rewrites model-bound tool output and can hide it through manage_context", async () => {
     const hooks = await DtocPlugin({} as Parameters<typeof DtocPlugin>[0])
     const transform = hooks["experimental.chat.messages.transform"]
+    const system = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({} as never, system)
+    expect(system.system.join("\n")).toContain("DTOC (Dynamic Tool Output Compression) is active")
+    expect(system.system.join("\n")).toContain("character count")
+
     const part = {
       sessionID: "session-1",
       callID: "call-1",

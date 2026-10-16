@@ -41,7 +41,7 @@ It is enabled by default. Options can be passed as the second item in the plugin
 }
 ```
 
-The plugin uses OpenCode's `experimental.chat.messages.transform` hook, so it does not modify the stored session messages. The mapping is kept in plugin memory for the running OpenCode process; OpenCode still retains the original tool output in session history.
+The plugin uses OpenCode's `experimental.chat.messages.transform` hook to change only model-bound messages and `experimental.chat.system.transform` to provide the DTOC operating instructions to the agent. It does not modify the stored session messages. The mapping is kept in plugin memory for the running OpenCode process; OpenCode still retains the original tool output in session history.
 
 ## Development
 
