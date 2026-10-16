@@ -84,7 +84,9 @@ export const DtocPlugin: Plugin = async (_input, rawOptions) => {
         description:
           "Control which previous tool outputs remain visible to the model. Use tool_key values from DTOC metadata. " +
           "Set enable and/or disable to arrays, and replace to a tool_key-to-text object. " +
-          "Each field may be omitted when unused. Batch related changes when practical.",
+          "Each field may be omitted when unused. Batch related changes when practical. " +
+          'Example: {"disable":["tk_001"],"enable":["tk_002"],"replace":{"tk_003":"All 42 tests passed. No failures.","tk_004":"Found 3 references to authenticate() in auth.ts."}}. ' +
+          "Use only one action per tool key in a single call.",
         args: {
           enable: tool.schema
             .array(tool.schema.string())
