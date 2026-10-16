@@ -1,8 +1,14 @@
-# OpenCode DTOC plugin
+# OpenCode DTOC
 
-Dynamic Tool Output Compression for OpenCode.
+Dynamic Tool Output Compression (DTOC) for OpenCode.
 
-This plugin keeps full tool results in OpenCode's existing session history, but changes the copy sent to the model. Each tool result gets a plain-text metadata block at the top:
+DTOC keeps the complete tool output in OpenCode's session history, while controlling the copy sent to the model. Large outputs can be hidden or replaced with a short, useful summary, reducing context pressure without deleting the original result.
+
+> `0.2.0` is currently the preview release. Install it with `opencode-dtoc@next` while validating it. Promote it to `latest` only after testing it in your environment.
+
+## What it does
+
+For every tracked tool result, DTOC adds a small plain-text metadata block:
 
 ```text
 [DTOC metadata]
@@ -13,7 +19,13 @@ status: visible
 [/DTOC metadata]
 ```
 
-When a result is hidden, the model sees the metadata and a short placeholder instead of the full result. The `manage_context` tool can restore, hide, or replace results by `tool_key`.
+The agent can use the `manage_context` tool to:
+
+- `disable`: hide one or more original outputs from the model.
+- `enable`: restore original outputs and clear any replacement.
+- `replace`: show agent-provided text instead of the original output.
+
+Example:
 
 ```json
 {
@@ -26,11 +38,23 @@ When a result is hidden, the model sees the metadata and a short placeholder ins
 }
 ```
 
-`replace` maps each tool key to the text shown to the model. DTOC keeps the original output, so `enable` restores the original and clears its replacement. A replacement is marked with `status: replaced`, the original `characters` count, `replacement_characters`, and `source: llm`.
+Use one action per tool key in a call. As a reminder, batch related changes in one `manage_context` call when practical instead of repeatedly changing one result at a time.
 
 ## Install
 
-Add the package to `opencode.json`:
+### Preview release from npm
+
+Add the preview tag to your `opencode.json`:
+
+```json
+{
+  "plugin": ["opencode-dtoc@next"]
+}
+```
+
+Restart OpenCode after changing the configuration. The plugin is enabled by default.
+
+When the release is promoted to stable, use:
 
 ```json
 {
@@ -38,13 +62,15 @@ Add the package to `opencode.json`:
 }
 ```
 
-It is enabled by default. Options can be passed as the second item in the plugin entry:
+### Plugin options
+
+Options are passed as the second item in the plugin entry:
 
 ```json
 {
   "plugin": [
     [
-      "opencode-dtoc",
+      "opencode-dtoc@next",
       {
         "excludeTools": ["some_tool"],
         "enabled": true
@@ -54,7 +80,51 @@ It is enabled by default. Options can be passed as the second item in the plugin
 }
 ```
 
-The plugin uses OpenCode's `experimental.chat.messages.transform` hook to change only model-bound messages and `experimental.chat.system.transform` to provide the DTOC operating instructions to the agent. It does not modify the stored session messages. The mapping is kept in plugin memory for the running OpenCode process; OpenCode still retains the original tool output in session history. Do not include the same tool key in more than one action in a single `manage_context` call.
+- `enabled`: enables or disables DTOC at startup. Defaults to `true`.
+- `excludeTools`: tool names that should not be tracked or transformed.
+
+### Install from source
+
+```sh
+git clone -b codex/opencode-v2 https://github.com/chaturvediabhay24/opencode-dtoc.git
+cd opencode-dtoc
+bun install
+bun test
+bun run build
+```
+
+For local development, point OpenCode at the built plugin using the absolute path to `dist/index.js` if your OpenCode version supports local plugin paths. Otherwise, use the npm `next` release.
+
+## How the model sees results
+
+DTOC does not rewrite the stored session history. It transforms model-bound messages only. The original output remains available to OpenCode and can be restored during the running process.
+
+Metadata statuses are:
+
+- `visible`: the original result is shown.
+- `hidden`: metadata and a placeholder are shown.
+- `replaced`: metadata and the replacement text are shown.
+
+For a replacement, DTOC reports the original `characters` count, the `replacement_characters` count, and `source: llm`. The tool-key mapping is held in memory for the running OpenCode process; restarting OpenCode starts a fresh mapping.
+
+## Context and caching
+
+DTOC is intended to reduce the amount of tool text included in later model requests. Changing an earlier result changes the prompt content after that point, so provider-side prompt caching may not reuse the same cached prefix for subsequent requests. In practice, stable replacements and batched context changes are preferable to repeatedly toggling individual results. Caching behavior remains provider- and model-specific.
+
+## Agent instructions
+
+The plugin adds these operating instructions to the system prompt:
+
+> Use `manage_context` when earlier tool output is no longer needed in full. Prefer `disable` for verbose output that can be safely omitted, `replace` for a concise factual summary, and `enable` when the original output is needed again. When possible, batch related changes in one call instead of repeatedly changing one tool output. This is a reminder, not a strict requirement.
+
+## Compatibility and limitations
+
+- Requires OpenCode `1.17.7` or newer.
+- Uses OpenCode's `experimental.chat.messages.transform` and `experimental.chat.system.transform` hooks.
+- Only model-bound messages are transformed; stored session messages are not modified.
+- State is process-local and in-memory.
+- Tool keys are generated by the plugin and are stable for the tracked results in the running process.
+- Do not use the same tool key in more than one action in a single `manage_context` call.
 
 ## Development
 
@@ -62,6 +132,28 @@ The plugin uses OpenCode's `experimental.chat.messages.transform` hook to change
 bun install
 bun test
 bun run build
+npm pack --dry-run
 ```
 
-This first version targets OpenCode 1.17.7 and newer.
+## Release process
+
+The detailed release checklist is in [`RELEASING.md`](RELEASING.md). The short version is:
+
+```sh
+bun test
+bun run build
+npm pack --dry-run
+npm publish --tag next
+```
+
+After validating the preview package:
+
+```sh
+npm dist-tag add opencode-dtoc@0.2.0 latest
+```
+
+Published npm versions cannot be overwritten. If a mistake is found, fix it and publish a new patch version.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).

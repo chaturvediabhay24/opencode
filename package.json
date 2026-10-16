@@ -4,13 +4,23 @@
   "description": "Dynamic Tool Output Compression for OpenCode",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chaturvediabhay24/opencode-dtoc.git"
+  },
+  "homepage": "https://github.com/chaturvediabhay24/opencode-dtoc#readme",
+  "bugs": {
+    "url": "https://github.com/chaturvediabhay24/opencode-dtoc/issues"
+  },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "engines": {
     "opencode": ">=1.17.7"
