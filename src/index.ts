@@ -1,6 +1,6 @@
 import type { Hooks, Plugin } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin/tool"
-import { DtocState, metadataFor, renderToolOutput, type DtocOptions } from "./state.js"
+import { DtocState, metadataFor, renderToolOutput, type ContextUsage, type DtocOptions } from "./state.js"
 
 type MessagesTransform = NonNullable<Hooks["experimental.chat.messages.transform"]>
 type TransformOutput = Parameters<MessagesTransform>[1]
@@ -20,7 +20,37 @@ function sessionIDFromMessages(output: TransformOutput) {
   return output.messages[0]?.info.sessionID
 }
 
-function transformMessages(state: DtocState, output: TransformOutput) {
+function latestAssistantUsage(output: TransformOutput, sessionID: string) {
+  let assistant: Extract<TransformOutput["messages"][number]["info"], { role: "assistant" }> | undefined
+  for (const { info } of output.messages) {
+    if (info.role !== "assistant" || info.sessionID !== sessionID || info.error) continue
+    const count = info.tokens.input + info.tokens.cache.read + info.tokens.cache.write
+    if (!Number.isFinite(count) || count <= 0) continue
+    if (!assistant || info.id > assistant.id) assistant = info
+  }
+  if (!assistant) return
+  const tokens = assistant.tokens
+  const count = tokens.input + tokens.cache.read + tokens.cache.write
+  return {
+    count,
+    modelID: assistant.modelID,
+    providerID: assistant.providerID,
+    messageID: assistant.id,
+  }
+}
+
+async function modelContextLimit(client: Parameters<Plugin>[0]["client"], providerID: string, modelID: string) {
+  try {
+    const response = await client.config.providers()
+    const limit = response.data?.providers.find((provider) => provider.id === providerID)?.models[modelID]?.limit.context
+    return limit && Number.isFinite(limit) && limit > 0 ? limit : undefined
+  } catch {
+    // Usage and DTOC still work if the provider catalogue is unavailable.
+    return undefined
+  }
+}
+
+function transformMessages(state: DtocState, output: TransformOutput, sessionID: string) {
   for (const message of output.messages) {
     for (const part of message.parts) {
       if (part.type !== "tool" || part.state.status !== "completed") continue
@@ -33,13 +63,14 @@ function transformMessages(state: DtocState, output: TransformOutput) {
         output: part.state.output,
         timestamp: part.state.time.end,
       })
-      part.state.output = renderToolOutput(entry)
+      part.state.output = renderToolOutput(entry, state.contextUsage(sessionID))
     }
   }
 }
 
-export const DtocPlugin: Plugin = async (_input, rawOptions) => {
+export const DtocPlugin: Plugin = async (input, rawOptions) => {
   const state = new DtocState(optionsFromUnknown(rawOptions))
+  const contextLimits = new Map<string, number | undefined>()
 
   return {
     tool: {
@@ -73,13 +104,34 @@ export const DtocPlugin: Plugin = async (_input, rawOptions) => {
         },
       }),
     },
-    "experimental.chat.messages.transform": async (_input, output) => {
-      if (!state.isEnabled() || !sessionIDFromMessages(output)) return
-      transformMessages(state, output)
+    "experimental.chat.messages.transform": async (_hookInput, output) => {
+      const sessionID = sessionIDFromMessages(output)
+      if (!state.isEnabled() || !sessionID) return
+
+      const usage = latestAssistantUsage(output, sessionID)
+      if (usage) {
+        const key = `${usage.providerID}/${usage.modelID}`
+        if (!contextLimits.has(key)) {
+          const limit = await modelContextLimit(input.client, usage.providerID, usage.modelID)
+          if (limit !== undefined) contextLimits.set(key, limit)
+        }
+        const limit = contextLimits.get(key)
+        const contextUsage: ContextUsage = {
+          tokens: usage.count,
+          limit,
+          percent: limit ? Math.round((usage.count / limit) * 1000) / 10 : undefined,
+          model: key,
+          messageID: usage.messageID,
+        }
+        state.setContextUsage(sessionID, contextUsage)
+      } else {
+        state.setContextUsage(sessionID, undefined)
+      }
+      transformMessages(state, output, sessionID)
     },
   }
 }
 
 export { DtocState, metadataFor, renderToolOutput }
-export type { DtocEntry, DtocOptions } from "./state.js"
+export type { ContextUsage, DtocEntry, DtocOptions } from "./state.js"
 export default DtocPlugin
