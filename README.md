@@ -4,7 +4,7 @@ Dynamic Tool Output Compression (DTOC) for OpenCode.
 
 DTOC keeps the complete tool output in OpenCode's session history, while controlling the copy sent to the model. Large outputs can be hidden or replaced with a short, useful summary, reducing context pressure without deleting the original result.
 
-> `0.2.0` is currently the preview release. Install it with `opencode-dtoc@next` while validating it. Promote it to `latest` only after testing it in your environment.
+> `0.2.1` is the preview release version. Install it with `opencode-dtoc@next` while validating it. Promote it to `latest` only after testing it in your environment.
 
 ## What it does
 
@@ -168,7 +168,7 @@ npm publish --tag next
 After validating the preview package:
 
 ```sh
-npm dist-tag add opencode-dtoc@0.2.0 latest
+npm dist-tag add opencode-dtoc@0.2.1 latest
 ```
 
 Published npm versions cannot be overwritten. If a mistake is found, fix it and publish a new patch version.

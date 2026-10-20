@@ -26,7 +26,7 @@ Use the `next` tag first so existing users on `latest` are not affected:
 npm whoami
 npm publish --tag next
 npm view opencode-dtoc dist-tags --json
-npm view opencode-dtoc@0.2.0 version
+npm view opencode-dtoc@0.2.1 version
 ```
 
 Install the preview with:
@@ -42,7 +42,7 @@ Then configure OpenCode with `"opencode-dtoc@next"` and test enable, disable, an
 After the preview is validated, move the exact published version to `latest`:
 
 ```sh
-npm dist-tag add opencode-dtoc@0.2.0 latest
+npm dist-tag add opencode-dtoc@0.2.1 latest
 npm view opencode-dtoc dist-tags --json
 ```
 
