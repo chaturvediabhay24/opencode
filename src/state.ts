@@ -10,6 +10,14 @@ export type DtocEntry = {
   replacementOutput?: string
 }
 
+export type ContextUsage = {
+  tokens: number
+  limit?: number
+  percent?: number
+  model?: string
+  messageID?: string
+}
+
 export type DtocOptions = {
   enabled?: boolean
   excludeTools?: string[]
@@ -22,6 +30,7 @@ type SessionState = {
   nextKey: number
   entriesByCallID: Map<string, DtocEntry>
   entriesByToolKey: Map<string, DtocEntry>
+  contextUsage?: ContextUsage
 }
 
 function createSession(): SessionState {
@@ -32,25 +41,36 @@ function createSession(): SessionState {
   }
 }
 
-export function metadataFor(entry: DtocEntry, status: "visible" | "hidden" | "replaced") {
+export function metadataFor(entry: DtocEntry, status: "visible" | "hidden" | "replaced", contextUsage?: ContextUsage) {
   const restore = status === "hidden" ? `\nrestore: call manage_context with ${entry.toolKey}` : ""
   const replacement = status === "replaced"
     ? `\nreplacement_characters: ${entry.replacementOutput?.length ?? 0}\nsource: llm`
     : ""
+  const context = contextUsage
+    ? [
+        "context_basis: last_reported_request_input (including cache; excludes new tool results and visibility changes)",
+        `context_tokens: ${contextUsage.tokens}`,
+        ...(contextUsage.limit ? [`context_limit: ${contextUsage.limit}`] : []),
+        ...(contextUsage.percent !== undefined ? [`context_percent: ${contextUsage.percent}%`] : []),
+        ...(contextUsage.model ? [`context_model: ${contextUsage.model}`] : []),
+        ...(contextUsage.messageID ? [`context_message_id: ${contextUsage.messageID}`] : []),
+      ]
+    : []
   return [
     DTOC_METADATA_START,
     `tool_key: ${entry.toolKey}`,
     `tool: ${entry.tool}`,
     `characters: ${entry.characters}`,
     `timestamp: ${entry.timestamp}`,
+    ...context,
     `status: ${status}${restore}${replacement}`,
     DTOC_METADATA_END,
   ].join("\n")
 }
 
-export function renderToolOutput(entry: DtocEntry) {
+export function renderToolOutput(entry: DtocEntry, contextUsage?: ContextUsage) {
   const status = !entry.visible ? "hidden" : entry.replacementOutput !== undefined ? "replaced" : "visible"
-  const metadata = metadataFor(entry, status)
+  const metadata = metadataFor(entry, status, contextUsage)
   if (!entry.visible) return `${metadata}\n\n[Full tool output hidden by DTOC.]`
   return `${metadata}\n\n${entry.replacementOutput ?? entry.originalOutput}`
 }
@@ -72,6 +92,14 @@ export class DtocState {
 
   isExcluded(tool: string) {
     return this.options.excludeTools?.includes(tool) ?? false
+  }
+
+  setContextUsage(sessionID: string, usage: ContextUsage | undefined) {
+    this.session(sessionID).contextUsage = usage
+  }
+
+  contextUsage(sessionID: string) {
+    return this.sessions.get(sessionID)?.contextUsage
   }
 
   private session(sessionID: string) {
